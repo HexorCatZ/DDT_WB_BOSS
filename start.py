@@ -2,28 +2,32 @@
 from os import chdir, getcwd, path, remove
 from datetime import datetime, timedelta
 from time import sleep
-from pyautogui import center, click, keyDown, keyUp, locate, locateAllOnScreen, locateOnScreen, press, screenshot, typewrite
-from pyautogui import locateOnScreen
+from pyautogui import center, click, keyDown, keyUp, locate, locateAllOnScreen, locateOnScreen, press, screenshot, typewrite, ImageNotFoundException
 
 # all setting location is here
-working_dir = "/tmp"
+#working_dir = "/tmp"
 images_dir = "Images"
 python_dir = getcwd()
 
+# ===== THIS PART HAS BEEN REMOVE TO SUPPORT WINDOWS =====
 # avoiding filepath error after changing a directory
-if path.exists('Images') is True:
-    images_dir = path.join(python_dir, images_dir)
-if path.exists(working_dir) is True:
-    chdir(working_dir)
-else:
-    print(path.basename(__file__), ':', working_dir, ':', 'file not found')
-    exit(1)
+#if path.exists('Images') is True:
+#    images_dir = path.join(python_dir, images_dir)
+#if path.exists(working_dir) is True:
+#    chdir(working_dir)
+#else:
+#    print(path.basename(__file__), ':', working_dir, ':', 'file not found')
+#    exit(1)
 
 print("searching for the game location")
-game_location = locateOnScreen(path.join(images_dir, 'LockChat.png'), confidence=0.9)
+game_location = None
 while game_location is None:
     sleep(1)
-    game_location = locateOnScreen(path.join(images_dir, 'LockChat.png'), confidence=0.9)
+    try:
+        game_location = locateOnScreen(path.join(images_dir, 'LockChat.png'), confidence=0.9)
+    except ImageNotFoundException:
+        pass
+    
 
 X_GAME = game_location[0] - 16
 Y_GAME = game_location[1] - 453
@@ -35,18 +39,33 @@ print("Game Coordinates :", X_GAME, Y_GAME)
 # ==============================================================================================================
 def waiting_for_my_turn():
     waiting_time = 0
-    while locateOnScreen(path.join(images_dir, 'Plus2.png'), grayscale=True,
-                         region=(X_GAME + 950, Y_GAME + 115, 45, 45), confidence=0.9) is None:
-        print('its not my turn')
-        waiting_time = waiting_time + 1
-        if waiting_time == 5:
-            print('check if im still in game')
-            if locateOnScreen(path.join(images_dir, 'GearLogo.png'), grayscale=True,
-                              region=(X_GAME + 940, Y_GAME, 35, 25)) is None:
-                break
+    while True:
+        try:
+            locateOnScreen(
+                path.join(images_dir, 'Plus2.png'),
+                grayscale=True,
+                region=(X_GAME + 950, Y_GAME + 115, 45, 45),
+                confidence=0.9
+            )
+        except ImageNotFoundException:
+            print('its not my turn')
+            waiting_time += 1
+
+            if waiting_time == 5:
+                print('check if im still in game')
+                try:
+                    locateOnScreen(
+                        path.join(images_dir, 'GearLogo.png'),
+                        grayscale=True,
+                        region=(X_GAME + 940, Y_GAME, 35, 25)
+                        )
+                except ImageNotFoundException:
+                    break
             else:
                 print('still in game')
                 sleep(0.5)
+                waiting_time = 0
+        else:
             waiting_time = 0
 
 def special_event(turn, special_turn):
@@ -61,22 +80,24 @@ def get_angle():
     screenshot('screenshot.png', region=(X_GAME, Y_GAME, 1000, 600))
 
     for f in range(0, 10):
-        angle_1 = locate(path.join(images_dir, str(f) + '.png'), 'screenshot.png',
-                         region=(38, 555, 12, 17), grayscale=True, confidence=0.9)
-        if angle_1 is not None:
+        try:
+            locate(path.join(images_dir, str(f) + '.png'), 'screenshot.png',
+                   region=(38, 555, 12, 17),
+                   grayscale=True, confidence=0.9
+                  )
             angle_1 = f * 10
             break
+        except ImageNotFoundException:
+            pass
 
     for g in range(0, 10):
-        angle_2 = locate(path.join(images_dir, str(g) + '.png'), 'screenshot.png',
+        try:
+            locate(path.join(images_dir, str(g) + '.png'), 'screenshot.png',
                          region=(48, 555, 12, 17), grayscale=True, confidence=0.9)
-        if angle_2 is not None:
+            return angle_1 + angle_2
+        except ImageNotFoundException:
             angle_2 = g
             break
-    if (angle_1 is not None) and (angle_2 is not None):
-        return angle_1 + angle_2
-    else:
-        return None
 
 def change_angle(wanted_angle):
     while True:
@@ -97,9 +118,8 @@ def change_angle(wanted_angle):
             break
 
 def attack(force):
-    pos1 = locateOnScreen(path.join(images_dir, 'pow.png'), grayscale=True,
-                          region=(X_GAME + 920, Y_GAME + 515, 65, 60))
-    if pos1 is not None:
+    try:
+        locateOnScreen(path.join(images_dir, 'pow.png'), grayscale=True, region=(X_GAME + 920, Y_GAME + 515, 65, 60))
         print('normal attack')
         press('1')
         press('2')
@@ -107,7 +127,7 @@ def attack(force):
         sleep(0.04 * force)
         press('4')
         keyUp('space')
-    elif pos1 is None:
+    except ImageNotFoundException:
         print('power attack')
         press('b')
         press('1')
@@ -142,12 +162,13 @@ change_angle(angle)
 
 # attack
 turn = 0
-while locateOnScreen(path.join(images_dir, 'GearLogo.png'), grayscale=True, region=(X_GAME + 940, Y_GAME, 35, 25)) is not None:
+try:
+    locateOnScreen(path.join(images_dir, 'GearLogo.png'), grayscale=True, region=(X_GAME + 940, Y_GAME, 35, 25)) is not None:
     turn = turn + 1
     if (str(special_turn) != 'start'):
         special_event(turn, special_turn)
-    attack(force)
-    sleep(5)
-    waiting_for_my_turn()
-else:
-    print("not in cave anymore")
+        attack(force)
+        sleep(5)
+        waiting_for_my_turn()
+except ImageNotFoundException:
+        print("not in cave anymore")
