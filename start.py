@@ -1,174 +1,57 @@
 #!/bin/python
-from os import chdir, getcwd, path, remove
-from datetime import datetime, timedelta
 from time import sleep
-from pyautogui import center, click, keyDown, keyUp, locate, locateAllOnScreen, locateOnScreen, press, screenshot, typewrite, ImageNotFoundException
+from os import path
+from pyautogui import click, press
+from DDT_Engine import *
 
-# all setting location is here
-#working_dir = "/tmp"
-images_dir = "Images"
-python_dir = getcwd()
+game = game_location()
+X_GAME = game[0]
+Y_GAME = game[1]
+in_game = game[2] 
 
-# ===== THIS PART HAS BEEN REMOVE TO SUPPORT WINDOWS =====
-# avoiding filepath error after changing a directory
-#if path.exists('Images') is True:
-#    images_dir = path.join(python_dir, images_dir)
-#if path.exists(working_dir) is True:
-#    chdir(working_dir)
-#else:
-#    print(path.basename(__file__), ':', working_dir, ':', 'file not found')
-#    exit(1)
+angle = 50
+force = 50
+power = '1'
 
-print("searching for the game location")
-game_location = None
-while game_location is None:
-    sleep(1)
-    try:
-        game_location = locateOnScreen(path.join(images_dir, 'LockChat.png'), confidence=0.9)
-    except ImageNotFoundException:
-        pass
-    
+# angle 55, force 45
+# attack 14445678
+# click 615 220 to enter
+# boss cool down 15 sec
 
-X_GAME = game_location[0] - 16
-Y_GAME = game_location[1] - 453
-GAME_HEIGHT = 599
-GAME_WIDTH = 999
-print("Game Coordinates :", X_GAME, Y_GAME)
-
-# function location
-# ==============================================================================================================
-def waiting_for_my_turn():
-    waiting_time = 0
-    while True:
-        try:
-            locateOnScreen(
-                path.join(images_dir, 'Plus2.png'),
-                grayscale=True,
-                region=(X_GAME + 950, Y_GAME + 115, 45, 45),
-                confidence=0.9
-            )
-        except ImageNotFoundException:
-            print('its not my turn')
-            waiting_time += 1
-
-            if waiting_time == 5:
-                print('check if im still in game')
-                try:
-                    locateOnScreen(
-                        path.join(images_dir, 'GearLogo.png'),
-                        grayscale=True,
-                        region=(X_GAME + 940, Y_GAME, 35, 25)
-                        )
-                except ImageNotFoundException:
-                    break
-            else:
-                print('still in game')
-                sleep(0.5)
-                waiting_time = 0
+loop_count = 0
+while True:
+    game = check_in_game()
+    in_game, chatbox_locked = game
+    if chatbox_locked:
+        # loby(locked)
+        click(X_GAME + 670, Y_GAME + 180)
+        sleep(1)
+        if not loop_count <= 15:
+            print('not in game for more than 15 seconds.\nprobably the game is over')
+            break
         else:
-            waiting_time = 0
-
-def special_event(turn, special_turn):
-    if (turn % special_turn) == 0:
-        for f in run_command:
-            exec(f)
-
-def get_angle():
-    if path.exists('screenshot.png') is True:
-        remove('screenshot.png')
-    sleep(0.1)
-    screenshot('screenshot.png', region=(X_GAME, Y_GAME, 1000, 600))
-
-    for f in range(0, 10):
-        try:
-            locate(path.join(images_dir, str(f) + '.png'), 'screenshot.png',
-                   region=(38, 555, 12, 17),
-                   grayscale=True, confidence=0.9
-                  )
-            angle_1 = f * 10
-            break
-        except ImageNotFoundException:
-            pass
-
-    for g in range(0, 10):
-        try:
-            locate(path.join(images_dir, str(g) + '.png'), 'screenshot.png',
-                         region=(48, 555, 12, 17), grayscale=True, confidence=0.9)
-            return angle_1 + angle_2
-        except ImageNotFoundException:
-            angle_2 = g
-            break
-
-def change_angle(wanted_angle):
-    while True:
-        current_angle = get_angle()
-        print('current angle is :', current_angle)
-        if (current_angle is not None) and (current_angle != wanted_angle):
-            if current_angle < wanted_angle:
-                press('w', presses=(wanted_angle - current_angle))
-                break
-            elif current_angle > wanted_angle:
-                press('s', presses=(current_angle - wanted_angle))
-                break
-            elif current_angle == wanted_angle:
-                break
-        if current_angle is None:
-            press('w', presses=wanted_angle)
-        if current_angle == wanted_angle:
-            break
-
-def attack(force):
-    try:
-        locateOnScreen(path.join(images_dir, 'pow.png'), grayscale=True, region=(X_GAME + 920, Y_GAME + 515, 65, 60))
-        print('normal attack')
-        press('1')
-        press('2')
-        keyDown('space')
-        sleep(0.04 * force)
-        press('4')
-        keyUp('space')
-    except ImageNotFoundException:
-        print('power attack')
-        press('b')
-        press('1')
-        press('1')
-        keyDown('space')
-        sleep(0.04 * force)
-        press('4')
-        keyUp('space')
-
-# ==============================================================================================================
-#
-
-# waiting to enter the room
-print('waiting to enter the game')
-while locateOnScreen(path.join(images_dir, 'GearLogo.png'), grayscale=True, region=(X_GAME + 940, Y_GAME, 35, 25)) is None:
-    print('still waiting...')
+            loop_count = 0
+    elif not chatbox_locked and not in_game:
+        # loby(unlocked)
+        sleep(1)
+    elif not chatbox_locked and in_game:
+        # in game
+        game = game_location()
+        X_GAME, Y_GAME, in_game = game
+        waiting_to_enter(10)
+        while waiting_for_my_turn():
+            print('change direction >>')
+            change_angle(angle,'d')
+            attack(force, power, power=True)
+            sleep(5)
+        for f in range(abs(15)):
+            print('waiting for ', 15 - f, 'seconds', end='\r')
+            sleep(1)
     sleep(1)
-else:
-    print('entering the room')
-sleep(waiting_at_the_begining)
-
-# all setup required here
-print("setup direction, angle and power bar")
-press('d')
-click(x=X_GAME + 973, y=Y_GAME + 445)
-print('check if you bring health kit')
-if (str(special_turn) == 'start'):
-    for f in run_command:
-        exec(f)
-print('setup angle to', angle)
-change_angle(angle)
-
-# attack
-turn = 0
-try:
-    locateOnScreen(path.join(images_dir, 'GearLogo.png'), grayscale=True, region=(X_GAME + 940, Y_GAME, 35, 25)) is not None:
-    turn = turn + 1
-    if (str(special_turn) != 'start'):
-        special_event(turn, special_turn)
-        attack(force)
-        sleep(5)
-        waiting_for_my_turn()
-except ImageNotFoundException:
-        print("not in cave anymore")
+while True:
+    game = check_in_game()
+    in_game, chatbox_locked = game
+    if not chatbox_locked and not in_game:
+        break
+        # loby(unlocked)
+        # click collect function
